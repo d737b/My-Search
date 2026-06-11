@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notion 注音搜尋</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.14.0/tabler-icons.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f5f4;
+    --bg3: #eeecea;
+    --text: #1a1a18;
+    --text2: #6b6b67;
+    --text3: #a0a09c;
+    --border: rgba(0,0,0,0.12);
+    --border2: rgba(0,0,0,0.22);
+    --accent: #3b5bdb;
+    --accent-bg: #eef2ff;
+    --accent-text: #2f4ab5;
+    --success-bg: #ebfbee;
+    --success-text: #2f9e44;
+    --danger-bg: #fff5f5;
+    --danger-text: #c92a2a;
+    --info-bg: #e7f5ff;
+    --info-text: #1971c2;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a;
+      --bg2: #252523;
+      --bg3: #2e2e2b;
+      --text: #f0ede8;
+      --text2: #a0a09c;
+      --text3: #68685f;
+      --border: rgba(255,255,255,0.1);
+      --border2: rgba(255,255,255,0.2);
+      --accent: #748ffc;
+      --accent-bg: #1e2a6e;
+      --accent-text: #a5b4fc;
+      --success-bg: #0d2b15;
+      --success-text: #6fcf97;
+      --danger-bg: #2b0d0d;
+      --danger-text: #fc8181;
+      --info-bg: #0d1f3c;
+      --info-text: #63b3ed;
+    }
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: -apple-system, 'Helvetica Neue', Arial, 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+    background: var(--bg2);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .layout {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--bg);
+    border-right: 0.5px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .brand {
+    padding: 0 1.25rem 1.5rem;
+    border-bottom: 0.5px solid var(--border);
+    margin-bottom: 1rem;
+  }
+
+  .brand-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .brand-sub {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+
+  .brand-icon {
+    width: 28px;
+    height: 28px;
+    background: var(--accent);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 14px;
+  }
+
+  .nav { padding: 0 0.75rem; flex: 1; }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    color: var(--text2);
+    cursor: pointer;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    transition: background 0.12s, color 0.12s;
+  }
+
+  .nav-item:hover { background: var(--bg2); color: var(--text); }
+  .nav-item.active { background: var(--accent-bg); color: var(--accent-text); font-weight: 500; }
+  .nav-item i { font-size: 18px; flex-shrink: 0; }
+
+  .conn-badge {
+    margin-left: auto;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 99px;
+    background: var(--success-bg);
+    color: var(--success-text);
+  }
+
+  .conn-badge.off {
+    background: var(--bg3);
+    color: var(--text3);
+  }
+
+  /* Main */
+  .main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .topbar {
+    background: var(--bg);
+    border-bottom: 0.5px solid var(--border);
+    padding: 0.875rem 1.75rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    max-width: 560px;
+  }
+
+  .search-input-wrap {
+    position: relative;
+    flex: 1;
+  }
+
+  .search-input-wrap i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 17px;
+    color: var(--text3);
+    pointer-events: none;
+  }
+
+  #search-input {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px 0 38px;
+    font-size: 15px;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    background: var(--bg2);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  #search-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59,91,219,0.12);
+    background: var(--bg);
+  }
+
+  .mic-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border2);
+    background: var(--bg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text2);
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+
+  .mic-btn:hover { background: var(--bg2); color: var(--text); }
+  .mic-btn.recording { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-text); }
+  .mic-btn i { font-size: 18px; }
+
+  .search-btn {
+    height: 40px;
+    padding: 0 18px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+
+  .search-btn:hover { opacity: 0.88; }
+
+  .bopo-tag {
+    font-size: 12px;
+    color: var(--text3);
+    font-family: monospace;
+    padding: 3px 10px;
+    background: var(--bg3);
+    border-radius: 99px;
+    white-space: nowrap;
+  }
+
+  /* Content area */
+  .content { flex: 1; padding: 1.5rem 1.75rem; }
+
+  /* Panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Status messages */
+  .status-msg {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    margin-bottom: 1rem;
+  }
+
+  .status-msg.info { background: var(--info-bg); color: var(--info-text); }
+  .status-msg.ok { background: var(--success-bg); color: var(--success-text); }
+  .status-msg.err { background: var(--danger-bg); color: var(--danger-text); }
+
+  /* Results */
+  .results-header {
+    font-size: 13px;
+    color: var(--text3);
+    margin-bottom: 12px;
+  }
+
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+  }
+
+  .result-card {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+
+  .result-card:hover {
+    border-color: var(--border2);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+
+  .result-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .result-sub {
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 8px;
+  }
+
+  .result-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+
+  .badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 99px;
+  }
+
+  .badge-field { background: var(--accent-bg); color: var(--accent-text); }
+  .badge-score-high { background: var(--success-bg); color: var(--success-text); }
+
+  .result-bopo {
+    font-size: 11px;
+    color: var(--text3);
+    font-family: monospace;
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 1rem;
+    color: var(--text3);
+  }
+
+  .empty-state i {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+
+  .empty-state p { font-size: 14px; }
+
+  /* Settings */
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    max-width: 860px;
+  }
+
+  @media (max-width: 640px) {
+    .settings-grid { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+  }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .card-title i { font-size: 16px; }
+
+  .form-row { margin-bottom: 14px; }
+  .form-row:last-child { margin-bottom: 0; }
+
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 5px;
+  }
+
+  input[type=text], input[type=password] {
+    width: 100%;
+    height: 36px;
+    padding: 0 11px;
+    font-size: 14px;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    background: var(--bg2);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  input[type=text]:focus, input[type=password]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59,91,219,0.1);
+    background: var(--bg);
+  }
+
+  .hint { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    font-size: 13px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 0.5px solid var(--border2);
+    background: var(--bg);
+    color: var(--text);
+    transition: background 0.12s;
+  }
+
+  .btn:hover { background: var(--bg2); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .btn-primary:hover { opacity: 0.88; background: var(--accent); }
+
+  .btn-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .field-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .field-row input { flex: 1; }
+
+  .remove-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border);
+    background: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text3);
+    flex-shrink: 0;
+    transition: all 0.12s;
+  }
+
+  .remove-btn:hover { background: var(--danger-bg); color: var(--danger-text); }
+
+  /* Spinner */
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border2);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.5s linear infinite;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Embed instructions */
+  .code-block {
+    background: var(--bg3);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--text);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    position: relative;
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border2);
+    background: var(--bg);
+    color: var(--text2);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .copy-btn:hover { background: var(--bg2); }
+
+  /* Step list */
+  .steps { counter-reset: step; }
+  .step {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 1rem;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent-bg);
+    color: var(--accent-text);
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step-body { font-size: 14px; color: var(--text); }
+  .step-body code { font-family: monospace; background: var(--bg3); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .content { padding: 1rem; }
+    .topbar { padding: 0.75rem 1rem; }
+    .result-grid { grid-template-columns: 1fr; }
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--text);
+    color: var(--bg);
+    padding: 10px 18px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    z-index: 999;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.2s;
+    pointer-events: none;
+  }
+
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  .settings-full { max-width: 760px; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-name">
+        <div class="brand-icon"><i class="ti ti-search"></i></div>
+        注音搜尋
+      </div>
+      <div class="brand-sub">Notion × 注音符號</div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" onclick="switchTab('search')" id="nav-search">
+        <i class="ti ti-search"></i> 搜尋
+        <span class="conn-badge off" id="conn-badge">未連線</span>
+      </button>
+      <button class="nav-item" onclick="switchTab('settings')" id="nav-settings">
+        <i class="ti ti-settings"></i> 設定
+      </button>
+      <button class="nav-item" onclick="switchTab('embed')" id="nav-embed">
+        <i class="ti ti-code"></i> 嵌入說明
+      </button>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="search-wrap">
+        <div class="search-input-wrap">
+          <i class="ti ti-search"></i>
+          <input type="text" id="search-input" placeholder="輸入地址、名稱…" oninput="onInput()" onkeydown="if(event.key==='Enter') doSearch()" autocomplete="off" />
+        </div>
+        <button class="mic-btn" id="mic-btn" onclick="toggleMic()" title="語音輸入">
+          <i class="ti ti-microphone" id="mic-icon"></i>
+        </button>
+        <button class="search-btn" onclick="doSearch()">
+          <i class="ti ti-search"></i> 搜尋
+        </button>
+      </div>
+      <span class="bopo-tag" id="bopo-tag" style="display:none"></span>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- Search Panel -->
+      <div class="panel active" id="panel-search">
+        <div id="search-status"></div>
+        <div id="results-area">
+          <div class="empty-state">
+            <i class="ti ti-database-search"></i>
+            <p>輸入關鍵字，以注音符號比對 Notion 資料庫</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Panel -->
+      <div class="panel" id="panel-settings">
+        <div class="settings-full">
+          <div class="settings-grid" style="margin-bottom:1rem">
+            <!-- API -->
+            <div class="card" style="grid-column: 1 / -1">
+              <div class="card-title"><i class="ti ti-plug"></i> Notion 連線設定</div>
+              <div class="form-row">
+                <label>Proxy URL（解決 CORS，建議填入）</label>
+                <input type="text" id="cfg-proxy-url" placeholder="https://your-worker.your-name.workers.dev" />
+                <div class="hint">部署 Cloudflare Worker 後填入網址，留空則直連 Notion（本機可能 CORS 失敗）</div>
+              </div>
+              <div class="form-row">
+                <label>Notion API Key（Integration Token）</label>
+                <input type="password" id="cfg-apikey" placeholder="secret_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                <div class="hint">前往 <a href="https://notion.so/my-integrations" target="_blank" style="color:var(--accent)">notion.so/my-integrations</a> 建立 Integration 後取得</div>
+              </div>
+              <div class="form-row">
+                <label>Database ID</label>
+                <input type="text" id="cfg-dbid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                <div class="hint">從 Notion DB 頁面 URL 中複製（32 位英數字元）</div>
+              </div>
+              <div class="btn-row">
+                <button class="btn btn-primary" onclick="saveAndTest()">
+                  <i class="ti ti-plug"></i> 儲存並測試連線
+                </button>
+                <span id="conn-status"></span>
+              </div>
+            </div>
+
+            <!-- Search fields -->
+            <div class="card">
+              <div class="card-title"><i class="ti ti-columns"></i> 注音比對欄位</div>
+              <div id="field-list"></div>
+              <button class="btn" onclick="addField()" style="margin-top:10px">
+                <i class="ti ti-plus"></i> 新增欄位
+              </button>
+              <div class="hint" style="margin-top:8px">欄位名稱需與 Notion DB 完全相同</div>
+            </div>
+
+            <!-- Display fields -->
+            <div class="card">
+              <div class="card-title"><i class="ti ti-layout-list"></i> 結果顯示欄位</div>
+              <div class="form-row">
+                <label>主標題欄位</label>
+                <input type="text" id="cfg-title-field" placeholder="名稱" />
+              </div>
+              <div class="form-row">
+                <label>副標題欄位</label>
+                <input type="text" id="cfg-sub-field" placeholder="地址" />
+              </div>
+              <div class="form-row">
+                <label>第三行欄位（選填）</label>
+                <input type="text" id="cfg-extra-field" placeholder="備註" />
+              </div>
+              <div class="btn-row">
+                <button class="btn btn-primary" onclick="saveSettings()">
+                  <i class="ti ti-device-floppy"></i> 儲存設定
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Embed Panel -->
+      <div class="panel" id="panel-embed">
+        <div style="max-width:680px">
+
+          <div class="card" style="margin-bottom:1rem; border-color: var(--accent)">
+            <div class="card-title"><i class="ti ti-cloud"></i> 步驟零：先部署 Cloudflare Worker（解決 CORS）</div>
+            <div class="steps">
+              <div class="step"><div class="step-num">1</div><div class="step-body">前往 <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--accent)">workers.cloudflare.com</a>，免費註冊後點「Create a Worker」</div></div>
+              <div class="step"><div class="step-num">2</div><div class="step-body">把下面的程式碼貼到編輯器，按「Save and deploy」</div></div>
+              <div class="step"><div class="step-num">3</div><div class="step-body">複製 Worker 網址（格式 <code>https://xxx.workers.dev</code>），貼到「設定 → Proxy URL」欄位</div></div>
+            </div>
+            <div class="code-block" id="worker-code" style="margin-top:12px"><button class="copy-btn" onclick="copyCode('worker-code')">複製</button>export default {
+  async fetch(request, env) {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, Notion-Version',
+        },
+      });
+    }
+    const url = new URL(request.url);
+    const notionPath = url.pathname.replace(/^\/notion/, '');
+    const notionUrl = `https://api.notion.com${notionPath}${url.search}`;
+    const headers = new Headers(request.headers);
+    headers.set('Notion-Version', '2022-06-28');
+    const resp = await fetch(notionUrl, {
+      method: request.method,
+      headers,
+      body: request.method !== 'GET' ? request.body : undefined,
+    });
+    return new Response(await resp.text(), {
+      status: resp.status,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    });
+  },
+};</div>
+          </div>
+
+          <div class="card" style="margin-bottom:1rem">
+            <div class="card-title"><i class="ti ti-brand-github"></i> 方法一：GitHub Pages 部署</div>
+            <div class="steps">
+              <div class="step"><div class="step-num">1</div><div class="step-body">到 <a href="https://github.com" target="_blank" style="color:var(--accent)">github.com</a> 建立新 Repository（如 <code>notion-search</code>）</div></div>
+              <div class="step"><div class="step-num">2</div><div class="step-body">將下載的 <code>notion-bopomofo-search.html</code> 改名為 <code>index.html</code>，上傳到 Repository</div></div>
+              <div class="step"><div class="step-num">3</div><div class="step-body">進入 Repository → <strong>Settings → Pages</strong>，Source 選 <code>main</code> branch，點 Save</div></div>
+              <div class="step"><div class="step-num">4</div><div class="step-body">網址：<code>https://你的帳號.github.io/notion-search/</code></div></div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:1rem">
+            <div class="card-title"><i class="ti ti-code"></i> 方法二：嵌入到現有網頁</div>
+            <div class="code-block" id="iframe-code"><button class="copy-btn" onclick="copyCode('iframe-code')">複製</button>&lt;iframe
+  src="https://你的帳號.github.io/notion-search/"
+  width="100%"
+  height="700"
+  frameborder="0"
+  style="border-radius:12px; border:1px solid #e5e5e3"
+&gt;&lt;/iframe&gt;</div>
+          </div>
+
+          <div class="card">
+            <div class="card-title"><i class="ti ti-file"></i> 方法三：本機開啟</div>
+            <div class="steps">
+              <div class="step"><div class="step-num">1</div><div class="step-body">下載 <code>notion-bopomofo-search.html</code>，用 Chrome 開啟</div></div>
+              <div class="step"><div class="step-num">2</div><div class="step-body">先完成步驟零（Worker），否則會 CORS 錯誤</div></div>
+              <div class="step"><div class="step-num">3</div><div class="step-body">到「設定」填入 Proxy URL、API Key、Database ID</div></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Bopomofo table ──────────────────────────────────────────────────────────
+const BM = {'阿':'ㄚ','啊':'ㄚ','哦':'ㄛ','鵝':'ㄜ','愛':'ㄞ','安':'ㄢ','昂':'ㄤ','嗯':'ㄣ','額':'ㄜ',
+'爸':'ㄅㄚ','白':'ㄅㄞ','百':'ㄅㄞ','班':'ㄅㄢ','邦':'ㄅㄤ','包':'ㄅㄠ','背':'ㄅㄟ','北':'ㄅㄟ',
+'本':'ㄅㄣ','崩':'ㄅㄥ','比':'ㄅㄧ','必':'ㄅㄧ','鞭':'ㄅㄧㄢ','表':'ㄅㄧㄠ','別':'ㄅㄧㄝ',
+'冰':'ㄅㄧㄥ','波':'ㄅㄛ','不':'ㄅㄨ','部':'ㄅㄨ','布':'ㄅㄨ','步':'ㄅㄨ','把':'ㄅㄚ',
+'大':'ㄉㄚ','達':'ㄉㄚ','帶':'ㄉㄞ','代':'ㄉㄞ','單':'ㄉㄢ','當':'ㄉㄤ','刀':'ㄉㄠ',
+'道':'ㄉㄠ','得':'ㄉㄜ','等':'ㄉㄥ','地':'ㄉㄧ','第':'ㄉㄧ','點':'ㄉㄧㄢ','店':'ㄉㄧㄢ',
+'丁':'ㄉㄧㄥ','定':'ㄉㄧㄥ','東':'ㄉㄨㄥ','動':'ㄉㄨㄥ','都':'ㄉㄨ','度':'ㄉㄨ','端':'ㄉㄨㄢ',
+'對':'ㄉㄨㄟ','多':'ㄉㄨㄛ','的':'ㄉㄜ','業':'ㄧㄝ','路':'ㄌㄨ','以':'ㄧ',
+'他':'ㄊㄚ','她':'ㄊㄚ','台':'ㄊㄞ','太':'ㄊㄞ','談':'ㄊㄢ','探':'ㄊㄢ','湯':'ㄊㄤ',
+'逃':'ㄊㄠ','特':'ㄊㄜ','天':'ㄊㄧㄢ','跳':'ㄊㄧㄠ','鐵':'ㄊㄧㄝ','通':'ㄊㄨㄥ',
+'頭':'ㄊㄡ','突':'ㄊㄨ','推':'ㄊㄨㄟ','托':'ㄊㄨㄛ',
+'那':'ㄋㄚ','哪':'ㄋㄚ','奶':'ㄋㄞ','南':'ㄋㄢ','難':'ㄋㄢ','鬧':'ㄋㄠ','呢':'ㄋㄜ',
+'能':'ㄋㄥ','你':'ㄋㄧ','年':'ㄋㄧㄢ','娘':'ㄋㄧㄤ','鳥':'ㄋㄧㄠ','牛':'ㄋㄧㄡ',
+'農':'ㄋㄨㄥ','女':'ㄋㄩ','暖':'ㄋㄨㄢ',
+'拉':'ㄌㄚ','來':'ㄌㄞ','蘭':'ㄌㄢ','狼':'ㄌㄤ','勞':'ㄌㄠ','老':'ㄌㄠ','樂':'ㄌㄜ',
+'冷':'ㄌㄥ','裡':'ㄌㄧ','連':'ㄌㄧㄢ','兩':'ㄌㄧㄤ','了':'ㄌㄜ','李':'ㄌㄧ','力':'ㄌㄧ',
+'林':'ㄌㄧㄣ','零':'ㄌㄧㄥ','留':'ㄌㄧㄡ','六':'ㄌㄧㄡ','隆':'ㄌㄨㄥ','龍':'ㄌㄨㄥ',
+'樓':'ㄌㄡ','盧':'ㄌㄨ','論':'ㄌㄨㄣ','亂':'ㄌㄨㄢ','略':'ㄌㄩㄝ','旅':'ㄌㄩ','綠':'ㄌㄩ',
+'媽':'ㄇㄚ','麻':'ㄇㄚ','馬':'ㄇㄚ','嗎':'ㄇㄚ','買':'ㄇㄞ','賣':'ㄇㄞ','慢':'ㄇㄢ',
+'忙':'ㄇㄤ','貓':'ㄇㄠ','沒':'ㄇㄟ','門':'ㄇㄣ','每':'ㄇㄟ','美':'ㄇㄟ','們':'ㄇㄣ',
+'夢':'ㄇㄥ','迷':'ㄇㄧ','面':'ㄇㄧㄢ','名':'ㄇㄧㄥ','明':'ㄇㄧㄥ','模':'ㄇㄛ',
+'木':'ㄇㄨ','目':'ㄇㄨ','母':'ㄇㄨ',
+'發':'ㄈㄚ','法':'ㄈㄚ','反':'ㄈㄢ','飯':'ㄈㄢ','方':'ㄈㄤ','放':'ㄈㄤ','非':'ㄈㄟ',
+'分':'ㄈㄣ','風':'ㄈㄥ','否':'ㄈㄡ','夫':'ㄈㄨ','服':'ㄈㄨ','付':'ㄈㄨ','府':'ㄈㄨ','福':'ㄈㄨ',
+'哥':'ㄍㄜ','個':'ㄍㄜ','各':'ㄍㄜ','給':'ㄍㄟ','跟':'ㄍㄣ','更':'ㄍㄥ','工':'ㄍㄨㄥ',
+'公':'ㄍㄨㄥ','共':'ㄍㄨㄥ','狗':'ㄍㄡ','古':'ㄍㄨ','國':'ㄍㄨㄛ','過':'ㄍㄨㄛ',
+'關':'ㄍㄨㄢ','光':'ㄍㄨㄤ','廣':'ㄍㄨㄤ',
+'可':'ㄎㄜ','克':'ㄎㄜ','客':'ㄎㄜ','開':'ㄎㄞ','看':'ㄎㄢ','考':'ㄎㄠ','口':'ㄎㄡ',
+'庫':'ㄎㄨ','快':'ㄎㄨㄞ','款':'ㄎㄨㄢ','況':'ㄎㄨㄤ',
+'喝':'ㄏㄜ','好':'ㄏㄠ','還':'ㄏㄞ','海':'ㄏㄞ','漢':'ㄏㄢ','行':'ㄏㄤ','號':'ㄏㄠ',
+'黑':'ㄏㄟ','很':'ㄏㄣ','紅':'ㄏㄨㄥ','後':'ㄏㄡ','話':'ㄏㄨㄚ','花':'ㄏㄨㄚ',
+'黃':'ㄏㄨㄤ','回':'ㄏㄨㄟ','會':'ㄏㄨㄟ','歡':'ㄏㄨㄢ','活':'ㄏㄨㄛ','或':'ㄏㄨㄛ','火':'ㄏㄨㄛ',
+'機':'ㄐㄧ','幾':'ㄐㄧ','家':'ㄐㄧㄚ','加':'ㄐㄧㄚ','間':'ㄐㄧㄢ','見':'ㄐㄧㄢ','將':'ㄐㄧㄤ',
+'江':'ㄐㄧㄤ','叫':'ㄐㄧㄠ','教':'ㄐㄧㄠ','街':'ㄐㄧㄝ','接':'ㄐㄧㄝ','今':'ㄐㄧㄣ',
+'金':'ㄐㄧㄣ','進':'ㄐㄧㄣ','京':'ㄐㄧㄥ','靜':'ㄐㄧㄥ','久':'ㄐㄧㄡ','九':'ㄐㄧㄡ',
+'就':'ㄐㄧㄡ','舊':'ㄐㄧㄡ','居':'ㄐㄩ','局':'ㄐㄩ','軍':'ㄐㄩㄣ','決':'ㄐㄩㄝ','覺':'ㄐㄩㄝ',
+'氣':'ㄑㄧ','七':'ㄑㄧ','起':'ㄑㄧ','前':'ㄑㄧㄢ','千':'ㄑㄧㄢ','強':'ㄑㄧㄤ','橋':'ㄑㄧㄠ',
+'切':'ㄑㄧㄝ','親':'ㄑㄧㄣ','青':'ㄑㄧㄥ','清':'ㄑㄧㄥ','球':'ㄑㄧㄡ','求':'ㄑㄧㄡ',
+'取':'ㄑㄩ','去':'ㄑㄩ','全':'ㄑㄩㄢ','卻':'ㄑㄩㄝ',
+'西':'ㄒㄧ','喜':'ㄒㄧ','下':'ㄒㄧㄚ','先':'ㄒㄧㄢ','現':'ㄒㄧㄢ','鄉':'ㄒㄧㄤ','向':'ㄒㄧㄤ',
+'小':'ㄒㄧㄠ','些':'ㄒㄧㄝ','謝':'ㄒㄧㄝ','心':'ㄒㄧㄣ','新':'ㄒㄧㄣ','星':'ㄒㄧㄥ',
+'需':'ㄒㄩ','學':'ㄒㄩㄝ','選':'ㄒㄩㄢ',
+'知':'ㄓ','只':'ㄓ','中':'ㄓㄨㄥ','重':'ㄓㄨㄥ','找':'ㄓㄠ','這':'ㄓㄜ','直':'ㄓ',
+'著':'ㄓㄜ','真':'ㄓㄣ','正':'ㄓㄥ','站':'ㄓㄢ','張':'ㄓㄤ',
+'在':'ㄗㄞ','再':'ㄗㄞ','早':'ㄗㄠ','最':'ㄗㄨㄟ','走':'ㄗㄡ','字':'ㄗ','自':'ㄗ',
+'總':'ㄗㄨㄥ','組':'ㄗㄨ','做':'ㄗㄨㄛ','坐':'ㄗㄨㄛ',
+'才':'ㄘㄞ','菜':'ㄘㄞ','側':'ㄘㄜ','從':'ㄘㄨㄥ','層':'ㄘㄥ','此':'ㄘ','次':'ㄘ',
+'草':'ㄘㄠ','存':'ㄘㄨㄣ',
+'四':'ㄙ','死':'ㄙ','雖':'ㄙㄨㄟ','隨':'ㄙㄨㄟ','三':'ㄙㄢ','色':'ㄙㄜ','送':'ㄙㄨㄥ',
+'所':'ㄙㄨㄛ','算':'ㄙㄨㄢ','歲':'ㄙㄨㄟ',
+'一':'ㄧ','已':'ㄧ','意':'ㄧ','有':'ㄧㄡ','又':'ㄧㄡ','用':'ㄩㄥ','右':'ㄧㄡ','要':'ㄧㄠ',
+'也':'ㄧㄝ','樣':'ㄧㄤ','讓':'ㄖㄤ','人':'ㄖㄣ','日':'ㄖ','入':'ㄖㄨ','如':'ㄖㄨ',
+'然':'ㄖㄢ','熱':'ㄖㄜ',
+'我':'ㄨㄛ','萬':'ㄨㄢ','問':'ㄨㄣ','文':'ㄨㄣ','物':'ㄨ','五':'ㄨ','午':'ㄨ',
+'玉':'ㄩ','語':'ㄩ','雨':'ㄩ','元':'ㄩㄢ','園':'ㄩㄢ','遠':'ㄩㄢ','月':'ㄩㄝ',
+'雲':'ㄩㄣ','運':'ㄩㄣ',
+'竹':'ㄓㄨ','主':'ㄓㄨ','住':'ㄓㄨ','注':'ㄓㄨ','助':'ㄓㄨ','柱':'ㄓㄨ',
+'初':'ㄔㄨ','出':'ㄔㄨ','車':'ㄔㄜ','成':'ㄔㄥ','城':'ㄔㄥ','程':'ㄔㄥ',
+'北':'ㄅㄟ','市':'ㄕ','是':'ㄕ','時':'ㄕ','事':'ㄕ','石':'ㄕ','使':'ㄕ','始':'ㄕ',
+'上':'ㄕㄤ','商':'ㄕㄤ','山':'ㄕㄢ','善':'ㄕㄢ','神':'ㄕㄣ','深':'ㄕㄣ','生':'ㄕㄥ',
+'省':'ㄕㄥ','書':'ㄕㄨ','水':'ㄕㄨㄟ','說':'ㄕㄨㄛ',
+'如':'ㄖㄨ','肉':'ㄖㄡ','人':'ㄖㄣ','日':'ㄖ','然':'ㄖㄢ',
+'竹南':'ㄓㄨㄋㄢ','新竹':'ㄒㄧㄣㄓㄨ','台灣':'ㄊㄞㄨㄢ',
+'區':'ㄑㄩ','里':'ㄌㄧ','號':'ㄏㄠ','段':'ㄉㄨㄢ','巷':'ㄒㄧㄤ','弄':'ㄌㄨㄥ','樓':'ㄌㄡ',
+'縣':'ㄒㄧㄢ','鄉':'ㄒㄧㄤ','鎮':'ㄓㄣ','村':'ㄘㄨㄣ',
+'東':'ㄉㄨㄥ','南':'ㄋㄢ','西':'ㄒㄧ','北':'ㄅㄟ','中':'ㄓㄨㄥ'};
+
+function toBopo(text) {
+  let r = '';
+  for (const ch of text) {
+    if (/[\u4e00-\u9fff]/.test(ch)) r += (BM[ch] || ch);
+    else r += ch.toLowerCase();
+  }
+  return r;
+}
+
+function bopoScore(q, text) {
+  if (!text) return 0;
+  const qb = toBopo(q), tb = toBopo(text);
+  if (tb.includes(qb)) return 1.0;
+  const qs = qb.replace(/[^\u3100-\u312f\u02ca\u02c7\u02cb\u02d9a-z0-9]/g,'');
+  const ts = tb.replace(/[^\u3100-\u312f\u02ca\u02c7\u02cb\u02d9a-z0-9]/g,'');
+  if (ts.includes(qs) && qs.length > 0) return 0.9;
+  if (text.toLowerCase().includes(q.toLowerCase())) return 0.8;
+  return 0;
+}
+
+// ── Config ──────────────────────────────────────────────────────────────────
+let cfg = { apiKey:'', dbId:'', proxyUrl:'', searchFields:['名稱','地址','備註'], titleField:'名稱', subField:'地址', extraField:'' };
+
+function loadCfg() {
+  try { const s = localStorage.getItem('nbsearch'); if(s) cfg = {...cfg,...JSON.parse(s)}; } catch(e){}
+  document.getElementById('cfg-apikey').value = cfg.apiKey;
+  document.getElementById('cfg-dbid').value = cfg.dbId;
+  document.getElementById('cfg-proxy-url').value = cfg.proxyUrl||'';
+  document.getElementById('cfg-title-field').value = cfg.titleField;
+  document.getElementById('cfg-sub-field').value = cfg.subField;
+  document.getElementById('cfg-extra-field').value = cfg.extraField||'';
+  renderFields();
+  updateConnBadge();
+}
+
+function saveCfg() {
+  cfg.apiKey = document.getElementById('cfg-apikey').value.trim();
+  cfg.dbId = document.getElementById('cfg-dbid').value.trim().replace(/[^a-zA-Z0-9]/g,'');
+  cfg.proxyUrl = document.getElementById('cfg-proxy-url').value.trim().replace(/\/$/,'');
+  cfg.titleField = document.getElementById('cfg-title-field').value.trim();
+  cfg.subField = document.getElementById('cfg-sub-field').value.trim();
+  cfg.extraField = document.getElementById('cfg-extra-field').value.trim();
+  // collect field names from DOM
+  cfg.searchFields = [...document.querySelectorAll('.field-input')].map(i=>i.value.trim()).filter(Boolean);
+  try { localStorage.setItem('nbsearch', JSON.stringify(cfg)); } catch(e){}
+}
+
+function updateConnBadge() {
+  const b = document.getElementById('conn-badge');
+  if (cfg.apiKey && cfg.dbId) { b.textContent='已連線'; b.className='conn-badge'; }
+  else { b.textContent='未連線'; b.className='conn-badge off'; }
+}
+
+function renderFields() {
+  const el = document.getElementById('field-list');
+  el.innerHTML = cfg.searchFields.map((f,i)=>`
+    <div class="field-row">
+      <input class="field-input" type="text" value="${f}" placeholder="欄位名稱" />
+      <button class="remove-btn" onclick="removeField(${i})"><i class="ti ti-x" style="font-size:14px"></i></button>
+    </div>`).join('');
+}
+
+function addField() { cfg.searchFields.push(''); renderFields(); }
+function removeField(i) { cfg.searchFields.splice(i,1); renderFields(); }
+
+function saveSettings() {
+  saveCfg();
+  updateConnBadge();
+  showToast('設定已儲存');
+}
+
+// ── Notion fetch (supports proxy) ─────────────────────────────────────────────
+function notionFetch(path, options={}) {
+  const base = cfg.proxyUrl ? `${cfg.proxyUrl}/notion` : 'https://api.notion.com';
+  return fetch(`${base}${path}`, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${cfg.apiKey}`,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json',
+      ...(options.headers||{}),
+    },
+  });
+}
+
+// ── Notion API ───────────────────────────────────────────────────────────────
+function getPropVal(prop) {
+  if (!prop) return '';
+  const t = prop.type;
+  if (t==='title') return prop.title?.map(x=>x.plain_text).join('')||'';
+  if (t==='rich_text') return prop.rich_text?.map(x=>x.plain_text).join('')||'';
+  if (t==='select') return prop.select?.name||'';
+  if (t==='multi_select') return prop.multi_select?.map(s=>s.name).join(' ')||'';
+  if (t==='url') return prop.url||'';
+  if (t==='email') return prop.email||'';
+  if (t==='phone_number') return prop.phone_number||'';
+  if (t==='number') return String(prop.number??'');
+  return '';
+}
+
+async function fetchAll() {
+  let pages=[], cursor;
+  while(true) {
+    const body = { page_size:100 };
+    if(cursor) body.start_cursor = cursor;
+    const r = await notionFetch(`/v1/databases/${cfg.dbId}/query`,{
+      method:'POST',
+      body:JSON.stringify(body)
+    });
+    if(!r.ok) { const d=await r.json(); throw new Error(d.message||'查詢失敗'); }
+    const d = await r.json();
+    pages = pages.concat(d.results);
+    if(!d.has_more) break;
+    cursor = d.next_cursor;
+  }
+  return pages;
+}
+
+// ── Search ───────────────────────────────────────────────────────────────────
+function onInput() {
+  const q = document.getElementById('search-input').value.trim();
+  const tag = document.getElementById('bopo-tag');
+  if(q) { tag.textContent = toBopo(q); tag.style.display=''; }
+  else tag.style.display='none';
+}
+
+async function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if(!q) return;
+  if(!cfg.apiKey || !cfg.dbId) {
+    document.getElementById('search-status').innerHTML = `<div class="status-msg err"><i class="ti ti-settings"></i> 請先在「設定」填入 API Key 與 Database ID</div>`;
+    return;
+  }
+  document.getElementById('search-status').innerHTML = `<div class="status-msg info"><span class="spinner"></span> 搜尋中，從 Notion 載入資料…</div>`;
+  document.getElementById('results-area').innerHTML = '';
+  try {
+    const pages = await fetchAll();
+    const results = [];
+    for(const page of pages) {
+      let best=0, matched=[];
+      for(const fn of cfg.searchFields) {
+        const prop = page.properties[fn];
+        if(!prop) continue;
+        const val = getPropVal(prop);
+        if(!val) continue;
+        const sc = bopoScore(q, val);
+        if(sc>0) { if(sc>best) best=sc; matched.push({fn,val,sc}); }
+      }
+      if(best>0) results.push({page,best,matched});
+    }
+    results.sort((a,b)=>b.best-a.best);
+    document.getElementById('search-status').innerHTML = '';
+    if(!results.length) {
+      document.getElementById('results-area').innerHTML = `<div class="empty-state"><i class="ti ti-search-off"></i><p>找不到「${q}」的相關結果</p><p style="font-size:12px;margin-top:6px;color:var(--text3)">注音：${toBopo(q)}</p></div>`;
+      return;
+    }
+    document.getElementById('results-area').innerHTML = `
+      <div class="results-header">找到 ${results.length} 筆結果 · 注音比對「${toBopo(q)}」</div>
+      <div class="result-grid">${results.map(({page,best,matched})=>{
+        const props = page.properties;
+        const title = getPropVal(props[cfg.titleField]) || Object.values(props).map(getPropVal).find(v=>v) || '（無標題）';
+        const sub = cfg.subField ? getPropVal(props[cfg.subField])||'' : '';
+        const extra = cfg.extraField ? getPropVal(props[cfg.extraField])||'' : '';
+        const badges = matched.map(m=>`<span class="badge badge-field">${m.fn}</span>`).join('');
+        const scoreClass = best>=0.95 ? 'badge-score-high' : '';
+        return `<a class="result-card" href="${page.url}" target="_blank">
+          <div class="result-title">${title}</div>
+          ${sub?`<div class="result-sub">${sub}</div>`:''}
+          ${extra?`<div class="result-sub" style="font-size:12px">${extra}</div>`:''}
+          <div class="result-badges">${badges}${best>=0.9?`<span class="badge ${scoreClass}" style="background:var(--success-bg);color:var(--success-text)">完全符合</span>`:''}</div>
+          <div class="result-bopo">注音：${toBopo(q)}</div>
+        </a>`;
+      }).join('')}</div>`;
+  } catch(e) {
+    document.getElementById('search-status').innerHTML = `<div class="status-msg err"><i class="ti ti-x"></i> 錯誤：${e.message}</div>`;
+  }
+}
+
+// ── Connection test ──────────────────────────────────────────────────────────
+async function saveAndTest() {
+  saveCfg();
+  updateConnBadge();
+  const el = document.getElementById('conn-status');
+  el.innerHTML = '<span class="status-msg info" style="display:inline-flex;padding:5px 12px"><span class="spinner"></span>&nbsp;連線測試中...</span>';
+  try {
+    const r = await notionFetch(`/v1/databases/${cfg.dbId}`);
+    if(r.ok) {
+      const d = await r.json();
+      el.innerHTML = `<span class="status-msg ok" style="display:inline-flex;padding:5px 12px"><i class="ti ti-check"></i>&nbsp;連線成功：${d.title?.[0]?.plain_text||'DB'}</span>`;
+      updateConnBadge();
+    } else {
+      const d = await r.json();
+      el.innerHTML = `<span class="status-msg err" style="display:inline-flex;padding:5px 12px"><i class="ti ti-x"></i>&nbsp;${d.message||'連線失敗'}</span>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<span class="status-msg err" style="display:inline-flex;padding:5px 12px"><i class="ti ti-x"></i>&nbsp;網路錯誤：${e.message}</span>`;
+  }
+}
+
+// ── Voice ────────────────────────────────────────────────────────────────────
+let recognition, isRec=false;
+function toggleMic() {
+  const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR) { showToast('此瀏覽器不支援語音，請用 Chrome'); return; }
+  if(isRec) { recognition.stop(); return; }
+  recognition = new SR();
+  recognition.lang='zh-TW'; recognition.interimResults=true;
+  recognition.onstart=()=>{ isRec=true; document.getElementById('mic-btn').classList.add('recording'); document.getElementById('mic-icon').className='ti ti-microphone-off'; };
+  recognition.onresult=e=>{ const t=Array.from(e.results).map(r=>r[0].transcript).join(''); document.getElementById('search-input').value=t; onInput(); };
+  recognition.onend=()=>{ isRec=false; document.getElementById('mic-btn').classList.remove('recording'); document.getElementById('mic-icon').className='ti ti-microphone'; const v=document.getElementById('search-input').value.trim(); if(v) doSearch(); };
+  recognition.start();
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(t) {
+  ['search','settings','embed'].forEach(id=>{
+    document.getElementById('panel-'+id).classList.toggle('active',id===t);
+    document.getElementById('nav-'+id).classList.toggle('active',id===t);
+  });
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+function copyCode(id) {
+  const el=document.getElementById(id);
+  const text=el.innerText.replace(/複製\s*/,'');
+  navigator.clipboard.writeText(text).then(()=>showToast('已複製'));
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadCfg();
+</script>
+</body>
+</html>
