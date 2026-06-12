@@ -676,25 +676,46 @@
           <div class="settings-grid" style="margin-bottom:1rem">
             <!-- API -->
             <div class="card" style="grid-column: 1 / -1">
-              <div class="card-title"><i class="ti ti-plug"></i> Notion 連線設定</div>
+              <div class="card-title"><i class="ti ti-key"></i> 快速設定（設定碼）</div>
               <div class="form-row">
-                <label>Proxy URL（解決 CORS，建議填入）</label>
+                <label>設定碼 <span style="font-weight:400;color:var(--text3)">— 貼上後自動填入所有設定</span></label>
+                <div style="display:flex;gap:8px">
+                  <input type="text" id="cfg-code" placeholder="貼上設定碼..." style="flex:1" oninput="onCodeInput()" />
+                  <button class="btn btn-primary" onclick="applyCode()" id="apply-code-btn" disabled style="white-space:nowrap">套用</button>
+                </div>
+                <div class="hint">設定碼包含 API Key + 設定頁 ID，一次搞定所有裝置</div>
+              </div>
+              <div id="qr-area" style="display:none; margin-top:12px; text-align:center">
+                <canvas id="qr-canvas" style="border-radius:8px"></canvas>
+                <div style="font-size:12px;color:var(--text3);margin-top:6px">掃此 QR code 在其他裝置快速設定</div>
+              </div>
+
+              <hr style="border:none;border-top:0.5px solid var(--border);margin:1rem 0">
+              <div class="card-title" style="margin-bottom:0.75rem"><i class="ti ti-plug"></i> 手動設定</div>
+              <div class="form-row">
+                <label>Proxy URL</label>
                 <input type="text" id="cfg-proxy-url" placeholder="https://your-worker.your-name.workers.dev" />
-                <div class="hint">部署 Cloudflare Worker 後填入網址，留空則直連 Notion（本機可能 CORS 失敗）</div>
+                <div class="hint">Cloudflare Worker 網址，解決 CORS 問題</div>
               </div>
               <div class="form-row">
-                <label>Notion API Key（Integration Token）</label>
+                <label>Notion API Key</label>
                 <input type="password" id="cfg-apikey" placeholder="secret_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
-                <div class="hint">前往 <a href="https://notion.so/my-integrations" target="_blank" style="color:var(--accent)">notion.so/my-integrations</a> 建立 Integration 後取得</div>
               </div>
               <div class="form-row">
-                <label>Database ID</label>
+                <label>Search Database ID</label>
                 <input type="text" id="cfg-dbid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
-                <div class="hint">從 Notion DB 頁面 URL 中複製（32 位英數字元）</div>
+              </div>
+              <div class="form-row">
+                <label>Settings DB ID <span style="font-weight:400;color:var(--text3)">— 把設定同步到 Notion DB，跨裝置共用</span></label>
+                <input type="text" id="cfg-setting-page-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx（選填）" />
+                <div class="hint">把你剛建立的 Settings DB 的 Database ID 貼在這裡（URL 裡的 32 碼英數字元）</div>
               </div>
               <div class="btn-row">
                 <button class="btn btn-primary" onclick="saveAndTest()">
                   <i class="ti ti-plug"></i> 儲存並測試連線
+                </button>
+                <button class="btn" onclick="genCode()" id="gen-code-btn" style="display:none">
+                  <i class="ti ti-qrcode"></i> 產生設定碼
                 </button>
                 <span id="conn-status"></span>
               </div>
@@ -727,7 +748,7 @@
               </div>
               <div class="btn-row">
                 <button class="btn btn-primary" onclick="saveSettings()">
-                  <i class="ti ti-device-floppy"></i> 儲存設定
+                  <i class="ti ti-device-floppy"></i> 儲存並同步到 Notion
                 </button>
               </div>
             </div>
@@ -850,30 +871,184 @@ function bopoScore(q, text) {
 }
 
 // ── Config ──────────────────────────────────────────────────────────────────
-let cfg = { apiKey:'', dbId:'', proxyUrl:'', searchFields:['名稱','地址','備註'], titleField:'名稱', subField:'地址', extraField:'' };
+let cfg = { apiKey:'', dbId:'', proxyUrl:'', settingPageId:'', searchFields:['名稱','地址','備註'], titleField:'名稱', subField:'地址', extraField:'' };
+
+// ── Setting Code (QR) ────────────────────────────────────────────────────────
+function encodeCode(apiKey, settingPageId) {
+  return btoa(unescape(encodeURIComponent(apiKey + '|' + settingPageId)));
+}
+function decodeCode(code) {
+  try {
+    const s = decodeURIComponent(escape(atob(code.trim())));
+    const idx = s.indexOf('|');
+    if(idx < 0) return null;
+    return { apiKey: s.slice(0, idx), settingPageId: s.slice(idx+1) };
+  } catch(e) { return null; }
+}
+
+function onCodeInput() {
+  const v = document.getElementById('cfg-code').value.trim();
+  document.getElementById('apply-code-btn').disabled = !v;
+}
+
+function applyCode() {
+  const code = document.getElementById('cfg-code').value.trim();
+  const parsed = decodeCode(code);
+  if(!parsed) { showToast('設定碼格式錯誤'); return; }
+  cfg.apiKey = parsed.apiKey;
+  cfg.settingPageId = parsed.settingPageId;
+  document.getElementById('cfg-apikey').value = cfg.apiKey;
+  document.getElementById('cfg-setting-page-id').value = cfg.settingPageId;
+  saveLocalCfg();
+  showToast('設定碼套用成功，正在從 Notion 載入設定…');
+  loadFromNotion();
+}
+
+function genCode() {
+  const key = document.getElementById('cfg-apikey').value.trim();
+  const pid = document.getElementById('cfg-setting-page-id').value.trim().replace(/[^a-zA-Z0-9]/g,'');
+  if(!key || !pid) { showToast('請先填入 API Key 和設定頁 Page ID'); return; }
+  const code = encodeCode(key, pid);
+  document.getElementById('cfg-code').value = code;
+  renderQR(code);
+  document.getElementById('qr-area').style.display = 'block';
+}
+
+function renderQR(text) {
+  // Simple QR via API (no library needed)
+  const canvas = document.getElementById('qr-canvas');
+  const size = Math.min(200, window.innerWidth - 80);
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0,0,size,size);
+  ctx.fillStyle = '#555';
+  ctx.font = '12px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('載入中…', size/2, size/2);
+  // Use QR server
+  const img = new Image();
+  img.onload = () => { ctx.clearRect(0,0,size,size); ctx.drawImage(img,0,0,size,size); };
+  img.src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}`;
+}
+
+// ── Notion Settings Database ─────────────────────────────────────────────────
+// Uses a Notion DB with columns: Key (title), Value (rich_text)
+// Looks for row where Key = 'config'
+
+async function findConfigPageId() {
+  // Query the settings DB for Key = 'config'
+  const pid = cfg.settingPageId.replace(/[^a-zA-Z0-9]/g,'');
+  const r = await notionFetch(`/v1/databases/${pid}/query`, {
+    method: 'POST',
+    body: JSON.stringify({
+      filter: { property: 'Key', title: { equals: 'config' } },
+      page_size: 1
+    })
+  });
+  if(!r.ok) return null;
+  const d = await r.json();
+  return d.results?.[0]?.id || null;
+}
+
+async function loadFromNotion() {
+  if(!cfg.apiKey || !cfg.settingPageId) return;
+  try {
+    const pageId = await findConfigPageId();
+    if(!pageId) {
+      showToast('設定 DB 尚無設定，請先「儲存並同步到 Notion」');
+      return;
+    }
+    const r = await notionFetch(`/v1/pages/${pageId}`);
+    if(!r.ok) { showToast('無法讀取設定，請確認 Integration 有存取權限'); return; }
+    const page = await r.json();
+    const jsonStr = page.properties?.['Value']?.rich_text?.[0]?.plain_text || '';
+    if(!jsonStr) return;
+    const remote = JSON.parse(jsonStr);
+    cfg = { ...cfg, ...remote, apiKey: cfg.apiKey, settingPageId: cfg.settingPageId };
+    saveLocalCfg();
+    fillFormFromCfg();
+    updateConnBadge();
+    showToast('✓ 已從 Notion 載入設定');
+  } catch(e) {
+    showToast('讀取設定失敗：' + e.message);
+  }
+}
+
+async function saveToNotion() {
+  if(!cfg.apiKey || !cfg.settingPageId) { showToast('請先填入 API Key 和設定 DB ID'); return; }
+  const { apiKey, settingPageId, ...toSave } = cfg;
+  const jsonStr = JSON.stringify(toSave);
+  try {
+    // Check if 'config' row exists
+    const existingId = await findConfigPageId();
+    if(existingId) {
+      // Update existing row
+      const r = await notionFetch(`/v1/pages/${existingId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          properties: {
+            'Value': { rich_text: [{ text: { content: jsonStr.slice(0,2000) } }] }
+          }
+        })
+      });
+      if(r.ok) showToast('✓ 設定已同步到 Notion');
+      else { const d=await r.json(); showToast('儲存失敗：'+(d.message||r.status)); }
+    } else {
+      // Create new row
+      const pid = cfg.settingPageId.replace(/[^a-zA-Z0-9]/g,'');
+      const r = await notionFetch(`/v1/pages`, {
+        method: 'POST',
+        body: JSON.stringify({
+          parent: { database_id: pid },
+          properties: {
+            'Key':   { title:     [{ text: { content: 'config' } }] },
+            'Value': { rich_text: [{ text: { content: jsonStr.slice(0,2000) } }] }
+          }
+        })
+      });
+      if(r.ok) showToast('✓ 設定已建立並同步到 Notion');
+      else { const d=await r.json(); showToast('建立失敗：'+(d.message||r.status)); }
+    }
+  } catch(e) { showToast('儲存失敗：'+e.message); }
+}
+
+// ── Local config ─────────────────────────────────────────────────────────────
+function saveLocalCfg() {
+  try { localStorage.setItem('nbsearch', JSON.stringify(cfg)); } catch(e){}
+}
+
+function fillFormFromCfg() {
+  document.getElementById('cfg-apikey').value = cfg.apiKey||'';
+  document.getElementById('cfg-dbid').value = cfg.dbId||'';
+  document.getElementById('cfg-proxy-url').value = cfg.proxyUrl||'';
+  document.getElementById('cfg-setting-page-id').value = cfg.settingPageId||'';
+  document.getElementById('cfg-title-field').value = cfg.titleField||'';
+  document.getElementById('cfg-sub-field').value = cfg.subField||'';
+  document.getElementById('cfg-extra-field').value = cfg.extraField||'';
+  renderFields();
+  const hasCode = cfg.apiKey && cfg.settingPageId;
+  document.getElementById('gen-code-btn').style.display = hasCode ? '' : 'none';
+}
 
 function loadCfg() {
   try { const s = localStorage.getItem('nbsearch'); if(s) cfg = {...cfg,...JSON.parse(s)}; } catch(e){}
-  document.getElementById('cfg-apikey').value = cfg.apiKey;
-  document.getElementById('cfg-dbid').value = cfg.dbId;
-  document.getElementById('cfg-proxy-url').value = cfg.proxyUrl||'';
-  document.getElementById('cfg-title-field').value = cfg.titleField;
-  document.getElementById('cfg-sub-field').value = cfg.subField;
-  document.getElementById('cfg-extra-field').value = cfg.extraField||'';
-  renderFields();
+  fillFormFromCfg();
   updateConnBadge();
+  // auto sync from Notion if settingPageId exists
+  if(cfg.apiKey && cfg.settingPageId) loadFromNotion();
 }
 
 function saveCfg() {
   cfg.apiKey = document.getElementById('cfg-apikey').value.trim();
   cfg.dbId = document.getElementById('cfg-dbid').value.trim().replace(/[^a-zA-Z0-9]/g,'');
   cfg.proxyUrl = document.getElementById('cfg-proxy-url').value.trim().replace(/\/$/,'');
+  cfg.settingPageId = document.getElementById('cfg-setting-page-id').value.trim().replace(/[^a-zA-Z0-9]/g,'');
   cfg.titleField = document.getElementById('cfg-title-field').value.trim();
   cfg.subField = document.getElementById('cfg-sub-field').value.trim();
   cfg.extraField = document.getElementById('cfg-extra-field').value.trim();
-  // collect field names from DOM
   cfg.searchFields = [...document.querySelectorAll('.field-input')].map(i=>i.value.trim()).filter(Boolean);
-  try { localStorage.setItem('nbsearch', JSON.stringify(cfg)); } catch(e){}
+  saveLocalCfg();
 }
 
 function updateConnBadge() {
@@ -897,7 +1072,10 @@ function removeField(i) { cfg.searchFields.splice(i,1); renderFields(); }
 function saveSettings() {
   saveCfg();
   updateConnBadge();
-  showToast('設定已儲存');
+  saveToNotion();
+  showToast('設定儲存中…');
+  const hasCode = cfg.apiKey && cfg.settingPageId;
+  document.getElementById('gen-code-btn').style.display = hasCode ? '' : 'none';
 }
 
 // ── Notion fetch (supports proxy) ─────────────────────────────────────────────
