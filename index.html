@@ -844,28 +844,57 @@ const BM = {"㐀":"ㄑㄧㄡ","㐁":"ㄊㄧㄢˇ","㐂":"ㄒㄧˇ","㐅":"ㄨˇ"
 const TONES = /[\u02ca\u02c7\u02cb\u02d9]/g;
 function stripTones(s) { return s.replace(TONES, ''); }
 
-function toBopo(text) {
-  let r = '';
+// 把文字轉成「每個字對應的注音 token」陣列
+// 例：「時興路」→ ['ㄕˊ','ㄒㄧㄥˋ','ㄌㄨˋ']
+function toBopoTokens(text) {
+  const tokens = [];
   for (const ch of text) {
-    if (/[\u4e00-\u9fff]/.test(ch)) r += (BM[ch] || ch);
-    else r += ch.toLowerCase();
+    if (/[\u4e00-\u9fff\u3400-\u4dbf]/.test(ch)) {
+      tokens.push(BM[ch] || ch);
+    } else if (/\s/.test(ch)) {
+      // 跳過空白
+    } else {
+      tokens.push(ch.toLowerCase());
+    }
   }
-  return r;
+  return tokens;
+}
+
+// 把 token 陣列轉成字串（用於字串層級比對）
+function toBopo(text) { return toBopoTokens(text).join(''); }
+
+// 檢查 queryTokens 是否為 textTokens 的連續子序列（去聲調版）
+function tokensContain(textTokens, queryTokens, stripT) {
+  if (queryTokens.length === 0) return false;
+  const norm = s => stripT ? stripTones(s) : s;
+  const q = queryTokens.map(norm);
+  const t = textTokens.map(norm);
+  // 滑動視窗：找連續匹配 q 的位置
+  outer: for (let i = 0; i <= t.length - q.length; i++) {
+    for (let j = 0; j < q.length; j++) {
+      if (t[i+j] !== q[j]) continue outer;
+    }
+    return true;
+  }
+  return false;
 }
 
 function bopoScore(q, text) {
   if (!text) return 0;
-  const qb = toBopo(q), tb = toBopo(text);
-  // 完整比對（含聲調）
-  if (tb.includes(qb)) return 1.0;
-  // 去聲調比對
-  const qbs = stripTones(qb), tbs = stripTones(tb);
-  if (tbs.includes(qbs) && qbs.length > 0) return 0.95;
-  // 只比注音符號（去非注音字元）
-  const qbc = qbs.replace(/[^\u3100-\u312fa-z0-9]/g,'');
-  const tbc = tbs.replace(/[^\u3100-\u312fa-z0-9]/g,'');
-  if (tbc.includes(qbc) && qbc.length > 0) return 0.9;
-  // 原文字面比對
+  const qTokens = toBopoTokens(q);
+  const tTokens = toBopoTokens(text);
+  if (qTokens.length === 0) return 0;
+
+  // 完整比對（含聲調，token 級）
+  if (tokensContain(tTokens, qTokens, false)) return 1.0;
+  // 去聲調比對（token 級）
+  if (tokensContain(tTokens, qTokens, true)) return 0.95;
+  // 只比注音符號本體（去非注音字元後再做 token 比對）
+  const stripBopo = s => s.replace(/[^\u3100-\u312f]/g,'');
+  const qBare = qTokens.map(stripBopo).filter(Boolean);
+  const tBare = tTokens.map(stripBopo).filter(Boolean);
+  if (qBare.length > 0 && tokensContain(tBare, qBare, false)) return 0.9;
+  // 原文字面比對（fallback）
   if (text.toLowerCase().includes(q.toLowerCase())) return 0.8;
   return 0;
 }
